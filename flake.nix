@@ -15,10 +15,25 @@
   outputs =
     inputs:
     inputs.flake-parts.lib.mkFlake { inherit inputs; } (
-      { lib, ... }: {
+      { lib, withSystem, ... }: {
         imports = [ inputs.pkgs-by-name.flakeModule ];
 
         systems = lib.systems.flakeExposed;
+
+        flake = {
+          nixosModules.ffmpeg-over-ip-server = import ./modules/ffmpeg-over-ip-server.nix;
+
+          overlays.default =
+            final: prev:
+            withSystem prev.stdenv.hostPlatform.system (
+              { config, ... }: {
+                ffmpeg-over-ip = config.packages.ffmpeg-over-ip;
+                ffmpeg-over-ip-client = config.packages.ffmpeg-over-ip-client;
+                ffmpeg-over-ip-ffmpeg = config.packages.ffmpeg-over-ip-ffmpeg;
+                ffmpeg-over-ip-server = config.packages.ffmpeg-over-ip-server;
+              }
+            );
+        };
 
         perSystem = { self', ... }: {
           pkgsDirectory = ./pkgs;
