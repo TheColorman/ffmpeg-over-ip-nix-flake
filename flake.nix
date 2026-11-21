@@ -35,11 +35,27 @@
             );
         };
 
-        perSystem = { self', ... }: {
-          pkgsDirectory = ./pkgs;
+        perSystem =
+          {
+            lib,
+            pkgs,
+            self',
+            ...
+          }:
+          {
+            checks = lib.optionalAttrs (pkgs.stdenv.hostPlatform.system == "x86_64-linux") {
+              ffmpeg-over-ip-server = import ./tests/nixos/ffmpeg-over-ip-server.nix {
+                inherit pkgs;
+                module = ./modules/ffmpeg-over-ip-server.nix;
+                serverPackage = self'.packages.ffmpeg-over-ip-server;
+                clientPackage = self'.packages.ffmpeg-over-ip-client;
+              };
+            };
 
-          packages.default = self'.packages.ffmpeg-over-ip;
-        };
+            pkgsDirectory = ./pkgs;
+
+            packages.default = self'.packages.ffmpeg-over-ip;
+          };
       }
     );
 }

@@ -63,3 +63,15 @@ file; see the [upstream configuration reference](https://github.com/steelbrain/f
 - `packages.<system>.ffmpeg-over-ip-server`
 - `packages.<system>.ffmpeg-over-ip-ffmpeg`
 - `nixosModules.ffmpeg-over-ip-server`
+
+## NixOS VM test
+
+On Linux, run the server integration test with:
+
+```sh
+nix build .#checks.x86_64-linux.ffmpeg-over-ip-server
+```
+
+The test boots the NixOS module, checks credential-based configuration and
+file logging, rejects incorrect client authentication, then transcodes and
+probes a sample through the packaged client and patched FFmpeg.
