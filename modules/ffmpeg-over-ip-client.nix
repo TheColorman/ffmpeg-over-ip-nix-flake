@@ -20,19 +20,21 @@ let
       ;
   };
   setupClient = pkgs.writeShellScript "ffmpeg-over-ip-client-setup" ''
-    if [ -z "''${FFMPEG_OVER_IP_CLIENT_AUTH_SECRET:-}" ]; then
-      echo "FFMPEG_OVER_IP_CLIENT_AUTH_SECRET is missing from the Jellyfin EnvironmentFile" >&2
+    if [ ! -r "$CREDENTIALS_DIRECTORY/auth-secret" ]; then
+      echo "The ffmpeg-over-ip client auth-secret systemd credential is missing" >&2
       exit 1
     fi
 
-    ${lib.optionalString (cfg.fallbackRewrites != [ ]) ''
-      ${pkgs.jq}/bin/jq -n \
-        --argjson settings ${lib.escapeShellArg clientConfig} \
-        --arg authSecret "$FFMPEG_OVER_IP_CLIENT_AUTH_SECRET" \
-        '$settings + { authSecret: $authSecret }' \
-        > ${clientConfigPath}
-      chmod 0600 ${clientConfigPath}
-    ''}
+    umask 077
+    if ! ${pkgs.jq}/bin/jq -e -n \
+      --argjson settings ${lib.escapeShellArg clientConfig} \
+      --rawfile authSecret "$CREDENTIALS_DIRECTORY/auth-secret" \
+      '$settings + { authSecret: ($authSecret | rtrimstr("\n")) } | select(.authSecret != "")' \
+      > ${clientConfigPath}; then
+      echo "The ffmpeg-over-ip client auth-secret credential is empty or invalid" >&2
+      exit 1
+    fi
+    chmod 0600 ${clientConfigPath}
   '';
 in
 {
@@ -62,10 +64,10 @@ in
     authSecretFile = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;
-      example = "/run/secrets/ffmpeg-over-ip-client.env";
+      example = "/run/secrets/ffmpeg-over-ip-auth-secret";
       description = ''
-        Required systemd EnvironmentFile containing
-        FFMPEG_OVER_IP_CLIENT_AUTH_SECRET. Keep this file outside the Nix store.
+        Required file containing only the shared authentication secret. It is
+        loaded as a systemd credential and is not copied into the Nix store.
       '';
     };
 
@@ -117,20 +119,13 @@ in
     );
 
     systemd.services.jellyfin = {
-      environment = {
-        FFMPEG_OVER_IP_CLIENT_ADDRESS = address;
-        FFMPEG_OVER_IP_CLIENT_FALLBACK_TO_LOCAL = lib.boolToString cfg.fallbackToLocal;
-        FFMPEG_OVER_IP_CLIENT_DEBUG = lib.boolToString cfg.debug;
-      }
-      // lib.optionalAttrs (cfg.fallbackRewrites != [ ]) {
-        FFMPEG_OVER_IP_CLIENT_CONFIG = clientConfigPath;
-      };
+      environment.FFMPEG_OVER_IP_CLIENT_CONFIG = clientConfigPath;
 
       serviceConfig = {
-        EnvironmentFile = lib.optional (cfg.authSecretFile != null) cfg.authSecretFile;
+        LoadCredential = lib.mkIf (cfg.authSecretFile != null) [
+          "auth-secret:${cfg.authSecretFile}"
+        ];
         ExecStartPre = [ "${setupClient}" ];
-      }
-      // lib.optionalAttrs (cfg.fallbackRewrites != [ ]) {
         RuntimeDirectory = "ffmpeg-over-ip-client";
         RuntimeDirectoryMode = "0700";
       };

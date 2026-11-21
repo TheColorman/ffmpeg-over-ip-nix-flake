@@ -14,12 +14,11 @@ pkgs.testers.runNixOSTest {
     }:
     let
       jellyfinStub = pkgs.writeShellScriptBin "jellyfin" ''
-        test "$FFMPEG_OVER_IP_CLIENT_ADDRESS" = "gpu-host.example:5443"
-        test "$FFMPEG_OVER_IP_CLIENT_AUTH_SECRET" = "vm-client-secret"
+        test -z "''${FFMPEG_OVER_IP_CLIENT_AUTH_SECRET:-}"
         test "$FFMPEG_OVER_IP_CLIENT_CONFIG" = "/run/ffmpeg-over-ip-client/config.json"
         ${pkgs.jq}/bin/jq -e \
-          --arg address "$FFMPEG_OVER_IP_CLIENT_ADDRESS" \
-          --arg secret "$FFMPEG_OVER_IP_CLIENT_AUTH_SECRET" \
+          --arg address "gpu-host.example:5443" \
+          --arg secret "vm-client-secret" \
           '.address == $address
             and .authSecret == $secret
             and .log == false
@@ -61,7 +60,7 @@ pkgs.testers.runNixOSTest {
         package = clientPackage;
         hostname = "gpu-host.example";
         port = 5443;
-        authSecretFile = "/run/secrets/ffmpeg-over-ip-client.env";
+        authSecretFile = "/run/secrets/ffmpeg-over-ip-auth-secret";
         fallbackToLocal = true;
         fallbackRewrites = [
           [
@@ -74,7 +73,7 @@ pkgs.testers.runNixOSTest {
 
       systemd.tmpfiles.rules = [
         "d /run/secrets 0700 root root -"
-        "f /run/secrets/ffmpeg-over-ip-client.env 0600 root root - FFMPEG_OVER_IP_CLIENT_AUTH_SECRET=vm-client-secret"
+        "f /run/secrets/ffmpeg-over-ip-auth-secret 0600 root root - vm-client-secret"
       ];
     };
 

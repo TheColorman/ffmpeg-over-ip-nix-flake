@@ -48,7 +48,7 @@ Enable the NixOS Jellyfin integration to use it and configure the client:
   services.ffmpeg-over-ip-client = {
     enableJellyfinIntegration = true;
     hostname = "gpu-host.example";
-    authSecretFile = "/run/secrets/ffmpeg-over-ip-client.env";
+    authSecretFile = "/run/secrets/ffmpeg-over-ip-auth-secret";
     fallbackToLocal = true;
     fallbackRewrites = [
       [ "h264_nvenc" "libx264" ]
@@ -58,15 +58,14 @@ Enable the NixOS Jellyfin integration to use it and configure the client:
 ```
 
 Enable `services.jellyfin` separately. The required `hostname` and
-`authSecretFile` options are checked when the integration is enabled; the
-environment file must define `FFMPEG_OVER_IP_CLIENT_AUTH_SECRET` and should be
-provided by a runtime secret manager rather than stored in the Nix store.
-Its contents should be a systemd environment assignment, for example
-`FFMPEG_OVER_IP_CLIENT_AUTH_SECRET=<shared-secret>`.
+`authSecretFile` options are checked when the integration is enabled.
+`authSecretFile` should point to a runtime file containing only the shared
+secret, not an environment-variable assignment. The module loads it as a
+systemd credential and writes a mode-`0600` client config under `/run`, keeping
+the secret out of the Nix store and the service environment.
 `port` defaults to `5050`. Client logging is disabled by the module; the
 `fallbackToLocal`, `fallbackRewrites`, and `debug` options configure its other
-runtime behavior. When fallback rewrites are configured, the module writes a
-mode-`0600` config under `/run` so the secret remains out of the Nix store.
+runtime behavior.
 
 See the [upstream configuration reference](https://github.com/steelbrain/ffmpeg-over-ip/blob/v6.0.0/docs/configuration.md).
 
