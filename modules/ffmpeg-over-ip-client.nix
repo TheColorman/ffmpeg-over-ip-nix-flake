@@ -48,6 +48,16 @@ in
       description = "The ffmpeg-over-ip client package used as Jellyfin's FFmpeg package.";
     };
 
+    fallbackPackage = lib.mkOption {
+      type = lib.types.package;
+      default = pkgs.jellyfin-ffmpeg;
+      defaultText = lib.literalExpression "pkgs.jellyfin-ffmpeg";
+      description = ''
+        Local Jellyfin FFmpeg package added to the service PATH when
+        fallbackToLocal is enabled.
+      '';
+    };
+
     hostname = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;
@@ -120,6 +130,7 @@ in
 
     systemd.services.jellyfin = {
       environment.FFMPEG_OVER_IP_CLIENT_CONFIG = clientConfigPath;
+      path = lib.optionals cfg.fallbackToLocal [ cfg.fallbackPackage ];
 
       serviceConfig = {
         LoadCredential = lib.mkIf (cfg.authSecretFile != null) [

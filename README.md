@@ -65,7 +65,9 @@ systemd credential and writes a mode-`0600` client config under `/run`, keeping
 the secret out of the Nix store and the service environment.
 `port` defaults to `5050`. Client logging is disabled by the module; the
 `fallbackToLocal`, `fallbackRewrites`, and `debug` options configure its other
-runtime behavior.
+runtime behavior. When `fallbackToLocal` is enabled, the module adds
+`fallbackPackage` (default `pkgs.jellyfin-ffmpeg`) to Jellyfin's `PATH`; set it
+to a different local FFmpeg package if needed.
 
 See the [upstream configuration reference](https://github.com/steelbrain/ffmpeg-over-ip/blob/v6.0.0/docs/configuration.md).
 
@@ -88,5 +90,6 @@ nix build .#checks.x86_64-linux.ffmpeg-over-ip-client
 The `ffmpeg-over-ip-server` test boots the server module, checks credential
 configuration and journal logging, rejects incorrect client authentication,
 then transcodes and probes a sample through the packaged client and patched
-FFmpeg. The `ffmpeg-over-ip-client` test verifies the Jellyfin environment and
-runtime config wiring.
+FFmpeg. The `ffmpeg-over-ip-client` test starts real Jellyfin with the
+ffmpeg-over-ip server unavailable, then verifies startup and a local fallback
+transcode and probe through the client FFmpeg package.
