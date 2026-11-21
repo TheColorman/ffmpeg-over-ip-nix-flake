@@ -1,19 +1,21 @@
 # ffmpeg-over-ip for Nix
 
-This flake provides a NixOS server module and packages for the ffmpeg-over-ip
+This flake provides a combined NixOS module and packages for the ffmpeg-over-ip
 client and server. The server package builds Jellyfin FFmpeg 8.1.3-2 from
 Jellyfin's fork, applies the upstream ffmpeg-over-ip file-I/O patches, and then
 applies the Jellyfin patches listed in `debian/patches/series`.
+The combined module defines both server and Jellyfin client options, so import
+`nixosModules.ffmpeg-over-ip` only once even when configuring both services.
 
 ## NixOS server
 
-Add this flake as an input, then import its overlay and module:
+Add this flake as an input, then import its overlay and combined module:
 
 ```nix
 { inputs, ... }:
 {
   nixpkgs.overlays = [ inputs.ffmpeg-over-ip.overlays.default ];
-  imports = [ inputs.ffmpeg-over-ip.nixosModules.ffmpeg-over-ip-server ];
+  imports = [ inputs.ffmpeg-over-ip.nixosModules.ffmpeg-over-ip ];
 
   services.ffmpeg-over-ip-server = {
     enable = true;
@@ -35,42 +37,57 @@ service. Server logs go to the journal and can be viewed with
 ## Jellyfin client
 
 The client package supplies `ffmpeg-over-ip-client`, `ffmpeg`, and `ffprobe`.
-Override Jellyfin's bundled FFmpeg package so its wrapper points at the client:
+Enable the NixOS Jellyfin integration to use it and configure the client:
 
 ```nix
-{ pkgs, ... }:
+{ inputs, ... }:
 {
-  services.jellyfin.package = pkgs.jellyfin.override {
-    jellyfin-ffmpeg = pkgs.ffmpeg-over-ip-client;
-  };
+  nixpkgs.overlays = [ inputs.ffmpeg-over-ip.overlays.default ];
+  imports = [ inputs.ffmpeg-over-ip.nixosModules.ffmpeg-over-ip ];
 
-  systemd.services.jellyfin = {
-    environment.FFMPEG_OVER_IP_CLIENT_ADDRESS = "gpu-host.example:5050";
-    serviceConfig.EnvironmentFile = [ "/run/secrets/ffmpeg-over-ip-client.env" ];
+  services.ffmpeg-over-ip-client = {
+    enableJellyfinIntegration = true;
+    hostname = "gpu-host.example";
+    authSecretFile = "/run/secrets/ffmpeg-over-ip-client.env";
+    fallbackToLocal = true;
+    fallbackRewrites = [
+      [ "h264_nvenc" "libx264" ]
+    ];
   };
 }
 ```
 
-The environment file should define `FFMPEG_OVER_IP_CLIENT_AUTH_SECRET` and be
-provided by a runtime secret manager rather than stored in the Nix store. The
-client also supports the upstream `/etc/ffmpeg-over-ip.client.jsonc` config
-file; see the [upstream configuration reference](https://github.com/steelbrain/ffmpeg-over-ip/blob/v6.0.0/docs/configuration.md).
+Enable `services.jellyfin` separately. The required `hostname` and
+`authSecretFile` options are checked when the integration is enabled; the
+environment file must define `FFMPEG_OVER_IP_CLIENT_AUTH_SECRET` and should be
+provided by a runtime secret manager rather than stored in the Nix store.
+Its contents should be a systemd environment assignment, for example
+`FFMPEG_OVER_IP_CLIENT_AUTH_SECRET=<shared-secret>`.
+`port` defaults to `5050`. Client logging is disabled by the module; the
+`fallbackToLocal`, `fallbackRewrites`, and `debug` options configure its other
+runtime behavior. When fallback rewrites are configured, the module writes a
+mode-`0600` config under `/run` so the secret remains out of the Nix store.
+
+See the [upstream configuration reference](https://github.com/steelbrain/ffmpeg-over-ip/blob/v6.0.0/docs/configuration.md).
 
 ## Packages
 
 - `packages.<system>.ffmpeg-over-ip-client`
 - `packages.<system>.ffmpeg-over-ip-server`
 - `packages.<system>.ffmpeg-over-ip-ffmpeg`
-- `nixosModules.ffmpeg-over-ip-server`
+- `nixosModules.ffmpeg-over-ip` (includes server and Jellyfin client options)
 
 ## NixOS VM test
 
-On Linux, run the server integration test with:
+On Linux, run the VM integration tests with:
 
 ```sh
 nix build .#checks.x86_64-linux.ffmpeg-over-ip-server
+nix build .#checks.x86_64-linux.ffmpeg-over-ip-client
 ```
 
-The test boots the NixOS module, checks credential-based configuration and
-journal logging, rejects incorrect client authentication, then transcodes and
-probes a sample through the packaged client and patched FFmpeg.
+The `ffmpeg-over-ip-server` test boots the server module, checks credential
+configuration and journal logging, rejects incorrect client authentication,
+then transcodes and probes a sample through the packaged client and patched
+FFmpeg. The `ffmpeg-over-ip-client` test verifies the Jellyfin environment and
+runtime config wiring.

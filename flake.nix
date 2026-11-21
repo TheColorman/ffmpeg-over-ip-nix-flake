@@ -21,7 +21,7 @@
         systems = lib.systems.flakeExposed;
 
         flake = {
-          nixosModules.ffmpeg-over-ip-server = import ./modules/ffmpeg-over-ip-server.nix;
+          nixosModules.ffmpeg-over-ip = import ./modules/ffmpeg-over-ip.nix;
 
           overlays.default =
             final: prev:
@@ -46,8 +46,13 @@
             checks = lib.optionalAttrs (pkgs.stdenv.hostPlatform.system == "x86_64-linux") {
               ffmpeg-over-ip-server = import ./tests/nixos/ffmpeg-over-ip-server.nix {
                 inherit pkgs;
-                module = ./modules/ffmpeg-over-ip-server.nix;
+                module = ./modules/ffmpeg-over-ip.nix;
                 serverPackage = self'.packages.ffmpeg-over-ip-server;
+                clientPackage = self'.packages.ffmpeg-over-ip-client;
+              };
+              ffmpeg-over-ip-client = import ./tests/nixos/ffmpeg-over-ip-client.nix {
+                inherit pkgs;
+                module = ./modules/ffmpeg-over-ip.nix;
                 clientPackage = self'.packages.ffmpeg-over-ip-client;
               };
             };
