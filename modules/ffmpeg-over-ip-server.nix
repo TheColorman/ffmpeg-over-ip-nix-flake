@@ -11,9 +11,9 @@ let
     inherit (cfg)
       address
       debug
-      log
       rewrites
       ;
+    log = "stderr";
   };
   writeConfig = pkgs.writeShellScript "ffmpeg-over-ip-server-config" ''
     ${pkgs.jq}/bin/jq -n \
@@ -56,19 +56,6 @@ in
       type = lib.types.bool;
       default = false;
       description = "Log original and rewritten ffmpeg arguments.";
-    };
-
-    log = lib.mkOption {
-      type = lib.types.oneOf [
-        lib.types.bool
-        lib.types.str
-      ];
-      default = false;
-      example = "stderr";
-      description = ''
-        Server log destination: false, stdout, stderr, or a file directly under
-        /var/log/ffmpeg-over-ip-server.
-      '';
     };
 
     rewrites = lib.mkOption {
@@ -141,26 +128,6 @@ in
         message = "services.ffmpeg-over-ip-server.authSecretFile must be set when the server is enabled.";
       }
       {
-        assertion = cfg.log != true;
-        message = "services.ffmpeg-over-ip-server.log must be false, stdout, stderr, or a supported file path.";
-      }
-      {
-        assertion =
-          !builtins.isString cfg.log
-          || builtins.elem cfg.log [
-            "stdout"
-            "stderr"
-          ]
-          || (
-            lib.hasPrefix "/var/log/ffmpeg-over-ip-server/" cfg.log
-            && builtins.dirOf cfg.log == "/var/log/ffmpeg-over-ip-server"
-          );
-        message = ''
-          File logs must be direct children of /var/log/ffmpeg-over-ip-server,
-          which the systemd service makes writable.
-        '';
-      }
-      {
         assertion = builtins.all (rewrite: builtins.length rewrite == 2) cfg.rewrites;
         message = "Each services.ffmpeg-over-ip-server.rewrites entry must contain exactly two strings.";
       }
@@ -194,8 +161,6 @@ in
         SupplementaryGroups = cfg.extraGroups;
         RuntimeDirectory = "ffmpeg-over-ip-server";
         RuntimeDirectoryMode = "0700";
-        LogsDirectory = "ffmpeg-over-ip-server";
-        LogsDirectoryMode = "0750";
         LoadCredential = lib.mkIf (cfg.authSecretFile != null) [
           "auth-secret:${cfg.authSecretFile}"
         ];
@@ -204,6 +169,8 @@ in
         Restart = "on-failure";
         RestartSec = "5s";
         UMask = "0077";
+        StandardOutput = "journal";
+        StandardError = "journal";
         NoNewPrivileges = true;
         PrivateTmp = true;
         ProtectHome = true;

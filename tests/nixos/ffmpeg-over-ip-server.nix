@@ -18,7 +18,6 @@ pkgs.testers.runNixOSTest {
         address = "127.0.0.1:5050";
         authSecretFile = "/run/secrets/ffmpeg-over-ip-auth-secret";
         debug = true;
-        log = "/var/log/ffmpeg-over-ip-server/server.log";
         rewrites = [
           [
             "h264_nvenc"
@@ -39,8 +38,12 @@ pkgs.testers.runNixOSTest {
     start_all()
     machine.wait_for_unit("multi-user.target")
     machine.wait_for_unit("ffmpeg-over-ip-server.service")
-    machine.wait_until_succeeds("grep -Fq 'listening on 127.0.0.1:5050' /var/log/ffmpeg-over-ip-server/server.log")
+    machine.wait_until_succeeds(
+        "journalctl -u ffmpeg-over-ip-server.service -b | "
+        "grep -Fq 'listening on 127.0.0.1:5050'"
+    )
 
+    machine.succeed("test \"$(stat -c %a /run/ffmpeg-over-ip-server)\" = 700")
     machine.succeed("test \"$(stat -c %a /run/ffmpeg-over-ip-server/config.json)\" = 600")
     machine.succeed("grep -Fq 'vm-test-secret' /run/ffmpeg-over-ip-server/config.json")
     machine.succeed("test \"$(systemctl show ffmpeg-over-ip-server.service --property=User --value)\" = ffmpeg-over-ip")
@@ -50,7 +53,10 @@ pkgs.testers.runNixOSTest {
         "FFMPEG_OVER_IP_CLIENT_AUTH_SECRET=wrong-secret "
         "${clientPackage}/bin/ffmpeg -version"
     )
-    machine.wait_until_succeeds("grep -Fq 'auth failed' /var/log/ffmpeg-over-ip-server/server.log")
+    machine.wait_until_succeeds(
+        "journalctl -u ffmpeg-over-ip-server.service -b | "
+        "grep -Fq 'auth failed'"
+    )
 
     machine.succeed(
         "FFMPEG_OVER_IP_CLIENT_ADDRESS=127.0.0.1:5050 "
@@ -71,6 +77,9 @@ pkgs.testers.runNixOSTest {
     assert stream["codec_name"] == "h264", stream
     assert stream["width"] == 64 and stream["height"] == 64, stream
 
-    machine.succeed("grep -Fq '[debug] rewritten args:' /var/log/ffmpeg-over-ip-server/server.log")
+    machine.succeed(
+        "journalctl -u ffmpeg-over-ip-server.service -b | "
+        "grep -Fq '[debug] rewritten args:'"
+    )
   '';
 }

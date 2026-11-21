@@ -25,13 +25,12 @@ Add this flake as an input, then import its overlay and module:
 ```
 
 The secret file should contain only the shared secret. The module loads it as a
-systemd credential and writes the server configuration under `/run`; the secret
-is not embedded in the Nix store. The default listen address is
+systemd credential and writes the server configuration to
+`/run/ffmpeg-over-ip-server/config.json` with mode `0600`; the secret is not
+embedded in the Nix store. Systemd creates this runtime directory for the
+service. Server logs go to the journal and can be viewed with
+`journalctl -u ffmpeg-over-ip-server`. The default listen address is
 `0.0.0.0:5050`. Configure `firewallPorts` if you use a different TCP port.
-For file logging, set `log` to a filename directly under
-`/var/log/ffmpeg-over-ip-server` (for example,
-`/var/log/ffmpeg-over-ip-server/server.log`); the module creates that writable
-directory while keeping the rest of the filesystem read-only to the service.
 
 ## Jellyfin client
 
@@ -73,5 +72,5 @@ nix build .#checks.x86_64-linux.ffmpeg-over-ip-server
 ```
 
 The test boots the NixOS module, checks credential-based configuration and
-file logging, rejects incorrect client authentication, then transcodes and
+journal logging, rejects incorrect client authentication, then transcodes and
 probes a sample through the packaged client and patched FFmpeg.
