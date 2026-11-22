@@ -12,7 +12,7 @@ let
   clientConfig = builtins.toJSON {
     inherit address;
     authSecret = "";
-    log = false;
+    log = if builtins.isString cfg.log then cfg.log else false;
     inherit (cfg)
       debug
       fallbackRewrites
@@ -46,6 +46,16 @@ in
       default = pkgs.ffmpeg-over-ip-client;
       defaultText = lib.literalExpression "pkgs.ffmpeg-over-ip-client";
       description = "The ffmpeg-over-ip client package used as Jellyfin's FFmpeg package.";
+    };
+
+    log = lib.mkOption {
+      type = lib.types.oneOf [
+        lib.types.bool
+        lib.types.str
+      ];
+      default = false;
+      example = "stderr";
+      description = "Client log destination: false, stdout, stderr, or a file path.";
     };
 
     fallbackPackage = lib.mkOption {
@@ -115,6 +125,10 @@ in
       {
         assertion = cfg.authSecretFile != null && cfg.authSecretFile != "";
         message = "services.ffmpeg-over-ip-client.authSecretFile must be set when Jellyfin integration is enabled.";
+      }
+      {
+        assertion = cfg.log != true;
+        message = "services.ffmpeg-over-ip-client.log must be false, stdout, stderr, or a file path.";
       }
       {
         assertion = builtins.all (rewrite: builtins.length rewrite == 2) cfg.fallbackRewrites;

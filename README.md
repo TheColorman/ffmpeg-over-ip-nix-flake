@@ -49,6 +49,7 @@ Enable the NixOS Jellyfin integration to use it and configure the client:
     enableJellyfinIntegration = true;
     hostname = "gpu-host.example";
     authSecretFile = "/run/secrets/ffmpeg-over-ip-auth-secret";
+    log = "stderr";
     fallbackToLocal = true;
     fallbackRewrites = [
       [ "h264_nvenc" "libx264" ]
@@ -63,9 +64,10 @@ Enable `services.jellyfin` separately. The required `hostname` and
 secret, not an environment-variable assignment. The module loads it as a
 systemd credential and writes a mode-`0600` client config under `/run`, keeping
 the secret out of the Nix store and the service environment.
-`port` defaults to `5050`. Client logging is disabled by the module; the
-`fallbackToLocal`, `fallbackRewrites`, and `debug` options configure its other
-runtime behavior. When `fallbackToLocal` is enabled, the module adds
+`port` defaults to `5050`. Client `log` defaults to `false` and accepts
+`false`, `"stdout"`, `"stderr"`, or a file path (`true` is invalid). The `fallbackToLocal`,
+`fallbackRewrites`, and `debug` options configure its other runtime behavior.
+When `fallbackToLocal` is enabled, the module adds
 `fallbackPackage` (default `pkgs.jellyfin-ffmpeg`) to Jellyfin's `PATH`; set it
 to a different local FFmpeg package if needed.
 

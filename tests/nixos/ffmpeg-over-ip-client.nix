@@ -33,6 +33,7 @@ pkgs.testers.runNixOSTest {
       services.ffmpeg-over-ip-client = {
         enableJellyfinIntegration = true;
         package = clientPackage;
+        log = "stderr";
         hostname = "127.0.0.1";
         authSecretFile = "/run/secrets/ffmpeg-over-ip-auth-secret";
         fallbackToLocal = true;
@@ -104,7 +105,7 @@ pkgs.testers.runNixOSTest {
         "${pkgs.jq}/bin/jq -e "
         "' .address == \"127.0.0.1:5050\" "
         "and .authSecret == \"vm-test-secret\" "
-        "and .log == false "
+        "and .log == \"stderr\" "
         "and .fallbackToLocal "
         "and .fallbackRewrites == [[\"h264_nvenc\", \"libx264\"]] ' "
         "/run/ffmpeg-over-ip-client/config.json >/dev/null"
